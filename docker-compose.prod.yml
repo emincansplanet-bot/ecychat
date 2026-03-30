@@ -1,0 +1,51 @@
+# Örnek: tek sunucuda app + Postgres (LIVE deneme — şifreleri değiştirin)
+# AUTH_SECRET, NEXTAUTH_URL, WHATSAPP_* üretim değerleriyle doldurun.
+#
+#   docker compose -f docker-compose.prod.yml up -d --build
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ecychat
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ecychat-change-me}
+      POSTGRES_DB: ecychat
+    volumes:
+      - ecychat_prod_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ecychat -d ecychat"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - ecychat_prod_redis:/data
+
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://ecychat:${POSTGRES_PASSWORD:-ecychat-change-me}@db:5432/ecychat?schema=public
+      AUTH_SECRET: ${AUTH_SECRET:?Set AUTH_SECRET in .env or shell}
+      AUTH_URL: ${AUTH_URL:-http://localhost:3000}
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-}
+      DEMO_MOCK_SEND: ${DEMO_MOCK_SEND:-false}
+      WHATSAPP_VERIFY_TOKEN: ${WHATSAPP_VERIFY_TOKEN:-}
+      WHATSAPP_APP_SECRET: ${WHATSAPP_APP_SECRET:-}
+      WHATSAPP_ACCESS_TOKEN: ${WHATSAPP_ACCESS_TOKEN:-}
+      WHATSAPP_API_VERSION: ${WHATSAPP_API_VERSION:-v22.0}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+volumes:
+  ecychat_prod_pg:
+  ecychat_prod_redis:

@@ -1,0 +1,32 @@
+# Yerel / tek sunucu LIVE hazırlığı — PostgreSQL
+# Başlat: docker compose up -d
+# Sonra: DATABASE_URL ile prisma migrate deploy + seed
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ecychat
+      POSTGRES_PASSWORD: ecychat
+      POSTGRES_DB: ecychat
+    ports:
+      - "5432:5432"
+    volumes:
+      - ecychat_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ecychat -d ecychat"]
+      interval: 5s
+      timeout: 5s
+      retries: 8
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - ecychat_redisdata:/data
+
+volumes:
+  ecychat_pgdata:
+  ecychat_redisdata:

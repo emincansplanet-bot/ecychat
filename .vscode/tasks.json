@@ -1,0 +1,13 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "ecychat: dev (Postgres + Next)",
+      "type": "npm",
+      "script": "dev",
+      "path": "ecychat",
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated" }
+    }
+  ]
+}

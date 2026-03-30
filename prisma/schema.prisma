@@ -1,0 +1,208 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  OPERATOR
+}
+
+model Organization {
+  id             String          @id @default(cuid())
+  name           String
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  users          User[]
+  channels       WhatsAppChannel[]
+  contacts       Contact[]
+  conversations  Conversation[]
+  quickReplies   QuickReply[]
+  promotions     Promotion[]
+  broadcastLogs  BroadcastLog[]
+  auditLogs      AuditLog[]
+}
+
+model User {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  email          String       @unique
+  passwordHash   String
+  name           String?
+  role           UserRole
+  active         Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  assignments ConversationAssignment[]
+  messages    Message[]      @relation("SentMessages")
+  broadcastLogs BroadcastLog[] @relation("BroadcastAuthor")
+  auditLogs   AuditLog[]   @relation("AuditActor")
+
+  @@index([organizationId])
+}
+
+/// Kritik yönetim aksiyonları (MVP denetim izi).
+model AuditLog {
+  id               String       @id @default(cuid())
+  organizationId   String
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  actorUserId      String?
+  actor            User?        @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  action           String
+  meta             Json?
+  createdAt        DateTime     @default(now())
+
+  @@index([organizationId, createdAt])
+}
+
+model BroadcastLog {
+  id                String       @id @default(cuid())
+  organizationId    String
+  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  body              String
+  successCount      Int
+  failCount         Int
+  targetLimit       Int          @default(0)
+  createdByUserId   String?
+  createdBy         User?        @relation("BroadcastAuthor", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  createdAt         DateTime     @default(now())
+
+  @@index([organizationId, createdAt])
+}
+
+/// Admin-managed WhatsApp Business line (Meta phone_number_id stored server-side only).
+model WhatsAppChannel {
+  id                String   @id @default(cuid())
+  organizationId    String
+  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  /// Meta Cloud API `phone_number_id` (globally unique when set).
+  metaPhoneNumberId String?  @unique
+  internalLabel     String
+  /// Sunucuda kalır; operatör görmez. Üretimde KMS/şifreleme önerilir.
+  graphApiAccessToken String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  conversations Conversation[]
+
+  @@index([organizationId])
+}
+
+model QuickReply {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  title          String
+  body           String
+  sortOrder      Int          @default(0)
+  active         Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([organizationId])
+}
+
+model Promotion {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  title          String
+  body           String
+  sortOrder      Int          @default(0)
+  active         Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([organizationId])
+}
+
+model Contact {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  waId           String
+  displayName    String?
+  notes          String?
+  /// Örn. ["VIP","Yeni"] — string dizisi JSON olarak saklanır.
+  tags           Json         @default("[]")
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  conversations Conversation[]
+
+  @@unique([organizationId, waId])
+}
+
+enum ConversationStatus {
+  OPEN
+  ARCHIVED
+}
+
+model Conversation {
+  id             String             @id @default(cuid())
+  organizationId String
+  organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  channelId      String
+  channel        WhatsAppChannel    @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  contactId      String
+  contact        Contact            @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  status         ConversationStatus @default(OPEN)
+  lastMessageAt  DateTime?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  messages    Message[]
+  assignments ConversationAssignment[]
+
+  @@unique([channelId, contactId])
+  @@index([organizationId, channelId])
+  @@index([organizationId, lastMessageAt])
+}
+
+model ConversationAssignment {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assignedAt     DateTime     @default(now())
+  unassignedAt   DateTime?
+
+  @@index([userId, unassignedAt])
+}
+
+enum MessageDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  AUDIO
+  VIDEO
+  DOCUMENT
+  UNKNOWN
+}
+
+model Message {
+  id             String           @id @default(cuid())
+  conversationId String
+  conversation   Conversation     @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  direction      MessageDirection
+  type           MessageType      @default(TEXT)
+  body           String?
+  waMessageId    String?          @unique
+  mediaUrl       String?
+  sentByUserId   String?
+  sentBy         User?            @relation("SentMessages", fields: [sentByUserId], references: [id], onDelete: SetNull)
+  createdAt      DateTime         @default(now())
+
+  @@index([conversationId, createdAt])
+}

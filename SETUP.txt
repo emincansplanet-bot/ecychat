@@ -1,0 +1,144 @@
+ECYChat — yerel demo ve LIVE’e hazırlık
+
+TEK PANEL PORTU (yerel)
+-----------------------
+Tarayıcıdan yalnızca şunu kullanın: http://localhost:3000
+
+`npm run dev` ve `npm run demo` Next’i **3000** portunda başlatır; `AUTH_URL` / `NEXTAUTH_URL`
+script tarafından bu porta hizalanır (`.env`’de yoksa). Eski denemelerden kalan 3001/3010 vb.
+süreçleri kapatın; `.env` içinde `PORT=3001` gibi satırlar varsa `PORT=3000` yapın veya silin.
+
+İstisna: `ECYCHAT_DEV_PORT=4000 npm run dev` ile geçici başka port (nadiren).
+
+Arka planda PostgreSQL **5432** ve isteğe bağlı Redis **6379** ayrı kalır — bunlar tarayıcı adresi değildir.
+
+Yerel PostgreSQL (Mac, Docker yok)
+----------------------------------
+Postgres’i doğrudan Mac’e kurduysanız `.env` içinde `ECYCHAT_SKIP_DOCKER=1` kullanın (aksi halde
+`npm run dev` Docker ile 5432’ye müdahale etmeye çalışır).
+
+Önerilen: süper kullanıcı ile bir kez `ecychat` rolü + veritabanı oluşturun:
+
+  cd ecychat
+  psql -U postgres -h 127.0.0.1 -p 5432 -d postgres -f scripts/init-local-postgres.sql
+
+(Süper kullanıcı adınız `postgres` değilse, kurulumda verdiğiniz kullanıcıyla `-U` değiştirin.)
+
+Sonra `DATABASE_URL="postgresql://ecychat:ecychat@127.0.0.1:5432/ecychat?schema=public"` kalır;
+`npx prisma migrate deploy` ve `npm run db:seed`, ardından `npm run dev`.
+
+Şifrede `!` gibi özel karakter varsa URL’de yüzde kodlaması gerekir (`!` → `%21`). Süper kullanıcıyı
+doğrudan `.env`’e yazmak yerine yukarıdaki `ecychat` kullanıcısı daha güvenli.
+
+VERİTABANI (PostgreSQL)
+-----------------------
+Varsayılan şema: PostgreSQL (SQLite kaldırıldı). Yerel için:
+
+  docker compose up -d
+  npm install
+  npm run demo
+
+Yerel Postgres: `npm run dev` → `scripts/dev-with-db.mjs` önce `ensure-db-local` (Docker + port),
+sonra `scripts/run-next-dev.mjs` (**localhost:3000**, webpack dev).
+IDE doğrudan `next dev` çalıştırırsa DB kontrolü olmaz — ya `npm run dev` kullanın ya da
+`ECYCHAT_SKIP_DOCKER=1 node scripts/run-next-dev.mjs` (Postgres hazırken). Eski hata devam ederse: `rm -rf .next`.
+
+`npm run demo` migrate öncesi `ensure-db-local` çalıştırır (DB şart).
+
+`npm run demo`: .env yoksa oluşturur (127.0.0.1:5432 ecychat/ecychat), `prisma migrate deploy`,
+seed, `run-next-dev.mjs` (port 3000). Postgres ayakta değilse migrate bağlanamaz.
+
+Diğer komutlar:
+  npm run docker:db     → sadece docker compose up -d
+  npm run db:deploy     → prisma migrate deploy (üretim deploy adımı)
+  npm run db:migrate    → şema değişince: prisma migrate dev
+
+Üretim başlatma: `npm run build` → deploy ortamında `npx prisma migrate deploy` (veya `npm run db:deploy`)
+→ `npm run start`. Tek komut isterseniz: `npm run start:live` (migrate deploy + next start).
+
+Yerel “tam çalışır” akış: .env içinde DEMO_MOCK_SEND=true iken giden mesajlar Meta’ya gitmeden DB’ye yazılır.
+Canlıda DEMO_MOCK_SEND=false + hat token / phone_number_id kullanın.
+
+Canlı yenileme: /api/events (SSE) + RealtimeBridge. Tek Node’da yerel bellek yeterli; birden fazla
+replika için `REDIS_URL` (örn. `redis://127.0.0.1:6379`, compose ile Redis servisi) tanımlayın —
+olaylar pub/sub ile paylaşılır.
+İsteğe bağlı tarayıcı bildirimi (panel üstündeki sarı şerit): gelen mesaj ve içerik (hızlı yanıt/promosyon)
+güncellemesi, sekme arka plandayken izin verildiyse. Konuşmada hızlı yanıt chip’inde ok (➤) veya promosyon «Gönder» ile metin doğrudan gider (normal mesaj API’si).
+Konuşma açılınca Meta okundu (token + wamid gerekir).
+Yazarken (canlı modda) müşteriye “yazıyor” için throttled POST; mesaj kutusunda ⌘↵ / Ctrl+↵ ile gönder.
+Çok süreç / serverless’te yalnızca yavaş yedek polling devreye girer.
+
+Yönetici: İçerik (hızlı yanıt / promosyon CRUD), Yayın (hedef + önizleme: POST …/broadcast preview:true + log
+JSON: GET /api/admin/broadcast/logs), Hatlar
+(Graph doğrulama + kopyalanabilir webhook URL), Arama (tam metin: GET /api/admin/search/messages), Çıkış IP
+(proxy bilgi sayfası), Denetim (audit + JSON: GET /api/admin/audit/logs, isteğe bağlı action / actionPrefix), Dışa aktarma (mesaj CSV + yayın CSV: GET /api/admin/export/broadcast + denetim CSV:
+GET /api/admin/export/audit). Özet: GET /api/dashboard/stats (yöneticide yayın özeti: son 30 gün
+BroadcastLog toplamları + son çalıştırma). Production’da sabit
+webhook adresi için NEXT_PUBLIC_APP_URL veya AUTH_URL önerilir; Meta’da WHATSAPP_VERIFY_TOKEN aynı olmalı.
+
+Sağlık kontrolü (auth yok): GET /api/health — veritabanı: GET /api/health?db=1
+
+Devre dışı kullanıcı: panel layout + tüm oturumlu API’ler 403; oturum kapatılır, /login?error=deactivated.
+
+Tarayıcı: http://localhost:3000
+
+Giriş:
+  admin@ecychat.local  veya  operator@ecychat.local
+  Şifre: changeme123  (veya SEED_ADMIN_PASSWORD)
+
+Operatör: sadece atanmış demo sohbeti görür. Gelen kutusu: Açık / Arşiv, Tümü / Yanıtsız / (yönetici) Atanmamış, arama, etiket.
+Yönetici: tüm sohbetler + Meta ID (varsa).
+
+Eski SQLite .env kullanıyorsanız: DATABASE_URL’i .env.example’daki PostgreSQL satırıyla değiştirin; docker compose up -d; prisma migrate deploy.
+
+PrismaClientValidationError: Unknown field `graphApiAccessToken`
+  → Şema güncellendi ama istemci üretilmemiş. Çözüm:
+    cd ecychat && rm -rf .next && npx prisma generate && npm run dev
+  (npm run dev her başlangıçta prisma generate çalıştırır; npm install sonrası postinstall da üretir.)
+
+---
+
+Hosting / canlıya alma (özet)
+-----------------------------
+Evet: müşteri ve Meta webhook’un panele ulaşması için uygulamanın **sürekli çalıştığı bir sunucu**
+(VPS, Kubernetes, Railway, Fly.io, Render, Hetzner, AWS ECS vb.) ve **PostgreSQL** (aynı makinede
+Docker veya yönetilen RDS/Neon/Supabase) gerekir.
+
+Minimum bileşenler:
+- HTTPS ile **sabit public URL** (Meta webhook ve NextAuth için `NEXTAUTH_URL` / `AUTH_URL` bu adrese
+  işaret etmeli).
+- Ortam değişkenleri: `DATABASE_URL`, güçlü `AUTH_SECRET`, `DEMO_MOCK_SEND=false`, WhatsApp token’ları.
+- İlk deploy: `prisma migrate deploy` (Dockerfile CMD bunu uygulama başlamadan çalıştırır).
+
+Docker (tek imaj):
+  docker build -t ecychat ./ecychat
+  # DATABASE_URL, AUTH_SECRET, NEXTAUTH_URL ile çalıştırın; örnek birleşik compose:
+  # ecychat/docker-compose.prod.yml
+
+Canlıya alma — Docker Compose (özet)
+-----------------------------------
+1) Sunucuda repo veya sadece `ecychat/` klasörü + Dockerfile + compose dosyaları.
+2) `ecychat/.env.production.example` içeriğine bakın; `ecychat` dizininde `.env` oluşturun:
+   güçlü `AUTH_SECRET`, `POSTGRES_PASSWORD`, **HTTPS** `AUTH_URL` / `NEXTAUTH_URL` / `NEXT_PUBLIC_APP_URL`,
+   `DEMO_MOCK_SEND=false`, Meta için `WHATSAPP_*`.
+3) `cd ecychat && docker compose -f docker-compose.prod.yml up -d --build`
+   — `app` konteyneri açılışta `prisma migrate deploy` çalıştırır, sonra `node server.js`.
+4) **İlk yönetici:** üretim imajında `npm run db:seed` yoktur. Güvenli ağdaysanız yerelden
+   bir kez `DATABASE_URL=postgresql://ecychat:ŞİFRE@SUNUCU_IP:5432/ecychat?schema=public npm run db:seed`
+   veya VPS’te geçici olarak Node + repoyla seed çalıştırın; ardından şifreleri değiştirin.
+5) Sağlık: `https://SİZİN_ADRES/api/health` ve `?db=1` (DB ping).
+6) Meta webhook callback URL: `https://SİZİN_ADRES/api/webhooks/whatsapp` — `WHATSAPP_VERIFY_TOKEN` aynı olmalı.
+
+Not: SSE tabanlı gelen kutusu **tek Node sürecinde** en sorunsuz çalışır; birden fazla replikada
+`REDIS_URL` (compose’ta Redis) tanımlıyken pub/sub devrededir; sticky session yine faydalı olabilir.
+
+---
+
+WhatsApp (isteğe bağlı)
+-----------------------
+WHATSAPP_VERIFY_TOKEN, webhook, WHATSAPP_ACCESS_TOKEN — .env.example
+
+Gelen görsel/ses/video/dosya: webhook `wa-media:{id}` saklar; panelde oynatma/indirme için
+hat token’ı veya WHATSAPP_ACCESS_TOKEN gerekir (Meta’dan akış proxy edilir).
+
+Giden dosya/medya: konuşma ekranından yükleme → Meta’ya upload + mesaj (demo modda yalnızca DB).
