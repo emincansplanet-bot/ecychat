@@ -54,6 +54,20 @@ function LoginForm() {
       return;
     }
     if (res?.url) {
+      // Sunucuda AUTH_URL hâlâ localhost ise NextAuth mutlak URL’yi yanlış üretebilir;
+      // kullanıcıyı her zaman şu anki kökende (ör. http://IP:3000) bırak.
+      try {
+        const next = new URL(res.url, window.location.origin);
+        if (
+          next.origin !== window.location.origin &&
+          (next.hostname === "localhost" || next.hostname === "127.0.0.1")
+        ) {
+          window.location.href = `${window.location.origin}${next.pathname}${next.search}`;
+          return;
+        }
+      } catch {
+        /* aşağıdaki atamaya düş */
+      }
       window.location.href = res.url;
     }
   }
