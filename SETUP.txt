@@ -123,9 +123,11 @@ Canlıya alma — Docker Compose (özet)
    `DEMO_MOCK_SEND=false`, Meta için `WHATSAPP_*`.
 3) `cd ecychat && docker compose -f docker-compose.prod.yml up -d --build`
    — `app` konteyneri açılışta `prisma migrate deploy` çalıştırır, sonra `node server.js`.
-4) **İlk yönetici:** üretim imajında `npm run db:seed` yoktur. Güvenli ağdaysanız yerelden
-   bir kez `DATABASE_URL=postgresql://ecychat:ŞİFRE@SUNUCU_IP:5432/ecychat?schema=public npm run db:seed`
-   veya VPS’te geçici olarak Node + repoyla seed çalıştırın; ardından şifreleri değiştirin.
+4) **İlk yönetici:** VPS’te Node/tsx gerekmez — bir kez:
+   `chmod +x scripts/seed-docker.sh && ./scripts/seed-docker.sh`
+   (`.env` içinde `POSTGRES_PASSWORD`; stack `up` iken). Giriş: `admin@ecychat.local` /
+   `SEED_ADMIN_PASSWORD` veya `changeme123`. Alternatif: güvenli ağda yerelden
+   `DATABASE_URL=postgresql://ecychat:ŞİFRE@… npm run db:seed`.
 5) Sağlık: `https://SİZİN_ADRES/api/health` ve `?db=1` (DB ping).
 6) Meta webhook callback URL: `https://SİZİN_ADRES/api/webhooks/whatsapp` — `WHATSAPP_VERIFY_TOKEN` aynı olmalı.
 
