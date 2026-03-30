@@ -136,11 +136,132 @@ Not: SSE tabanlı gelen kutusu **tek Node sürecinde** en sorunsuz çalışır; 
 
 ---
 
-WhatsApp (isteğe bağlı)
------------------------
+WhatsApp (isteğe bağlı — özet)
+------------------------------
 WHATSAPP_VERIFY_TOKEN, webhook, WHATSAPP_ACCESS_TOKEN — .env.example
 
 Gelen görsel/ses/video/dosya: webhook `wa-media:{id}` saklar; panelde oynatma/indirme için
 hat token’ı veya WHATSAPP_ACCESS_TOKEN gerekir (Meta’dan akış proxy edilir).
 
 Giden dosya/medya: konuşma ekranından yükleme → Meta’ya upload + mesaj (demo modda yalnızca DB).
+
+
+================================================================================
+WhatsApp CANLI — adım adım (Meta + VPS)
+================================================================================
+Amacı: Gelen mesajlar panele düşsün, operatörden gidenler Meta’ya gitsin. Önkoşul: VPS’te
+`docker compose -f docker-compose.prod.yml` ile app zaten ayakta; `DEMO_MOCK_SEND=false`.
+
+ADIM 0 — Topladıkların
+----------------------
+• Bir alan adı önerilir (ör. wa.sirketin.com). DNS’te A kaydı → sunucu IPv4.
+• [developers.facebook.com] hesabı; işletme Meta Business’e bağlı olabilmeli.
+• ECYChat .env içinde güçlü AUTH_SECRET ve POSTGRES_PASSWORD (zaten var).
+
+ADIM 1 — DNS
+------------
+Alan adı sağlayıcı panelinde:
+
+  Türü A    İsim wa (veya @)    Değer 78.135.93.8 (örnek IP)
+
+Yayılımı bekle (birkaç dk–48 saat). Kontrol: `ping wa.sirketin.com` veya `dig +short wa.sirketin.com`
+
+ADIM 2 — HTTPS (Nginx ters vekil + Let’s Encrypt)
+-------------------------------------------------
+Meta webhook için genelde **https://** gerekir; düz http://IP:3000 kalıcı çözüm değildir.
+
+Sunucuda (Ubuntu örnek):
+
+  apt install -y nginx
+  ufw allow 'Nginx Full'    # veya allow 80,443/tcp
+
+Nginx site (ör. /etc/nginx/sites-available/ecychat) — ALAN_ADI ve yolu kendine göre:
+
+  server {
+      listen 80;
+      server_name wa.sirketin.com;
+      location / {
+          proxy_pass http://127.0.0.1:3000;
+          proxy_http_version 1.1;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+          proxy_set_header Upgrade $http_upgrade;
+          proxy_set_header Connection "upgrade";
+      }
+  }
+
+  ln -s /etc/nginx/sites-available/ecychat /etc/nginx/sites-enabled/
+  nginx -t && systemctl reload nginx
+
+Sertifika:
+
+  apt install -y certbot python3-certbot-nginx
+  certbot --nginx -d wa.sirketin.com
+
+Sonra tarayıcı: https://wa.sirketin.com/login açılmalı (ECYChat giriş).
+
+ADIM 3 — ECYChat .env (HTTPS adresi)
+--------------------------------------
+`/opt/ecychat/.env` içinde üçlüyü domain ile güncelle ve tutarlı yap:
+
+  AUTH_URL=https://wa.sirketin.com
+  NEXTAUTH_URL=https://wa.sirketin.com
+  NEXT_PUBLIC_APP_URL=https://wa.sirketin.com
+  DEMO_MOCK_SEND=false
+
+Verify token ve app secret için yer aç (sonraki adım):
+
+  WHATSAPP_VERIFY_TOKEN=buraya-uzun-rastgele-bir-metin-aynisi-meta-da
+  WHATSAPP_APP_SECRET=   (ADIM 5’te doldur)
+  WHATSAPP_ACCESS_TOKEN= (kalıcı sistem kullanıcı token’ı veya geçici test token’ı)
+  WHATSAPP_API_VERSION=v22.0
+
+Uygulamayı yeniden okut:
+
+  cd /opt/ecychat
+  docker compose -f docker-compose.prod.yml up -d --force-recreate app
+
+ADIM 4 — Meta’da uygulama ve WhatsApp
+--------------------------------------
+1) developers.facebook.com → Uygulama oluştur (tür: İdeal “İş” / Business).
+2) Ürün ekle: **WhatsApp**.
+3) WhatsApp → **API kurulumu** (veya Başlama): **Telefon numarası kimliği** (`phone_number_id`)
+   not et. Test numarasıyla başlayıp sonra üretim numarasına geçilebilir.
+4) Erişim jetonu: Geliştirme için **geçici jeton** kullanılabilir; canlıda **uzun ömürlü**
+   jeton (İşletme ayarları / Sistem kullanıcıları + varlık atama) önerilir — süresi dolunca
+   giden mesaj kesilir.
+
+ADIM 5 — Meta uygulama gizli anahtarı ve webhook
+-------------------------------------------------
+1) Uygulama paneli → **Ayarlar** → **Temel** → **Uygulama gizli anahtarı** (App Secret)
+   → `.env` içinde **WHATSAPP_APP_SECRET=** (POST imzası; üretimde şart).
+2) WhatsApp → **Yapılandırma** → Webhook → **Geri arama URL’si**:
+     https://wa.sirketin.com/api/webhooks/whatsapp
+   **Doğrulama belirteci**: `.env`’deki **WHATSAPP_VERIFY_TOKEN** ile **aynı** string.
+3) Webhook alanlarında **messages** (ve ihtiyaca göre diğer WhatsApp alanları) aboneliğini
+   aç / kaydet.
+4) “Doğrula ve kaydet” — ECYChat’in ayakta ve HTTPS’nin çalışıyor olması gerekir; hata alırsan
+   nginx + firewall 443 ve app loglarına bak: `docker compose … logs app --tail 80`
+
+ADIM 6 — Panelden hat (kanal)
+-----------------------------
+1) Panele admin giriş → **Yönetici → Hatlar** (veya Channels).
+2) `phone_number_id` değerini Meta’dan kopyala; **Graph API erişim jetonu**nu hat üzerinde
+   kaydet (veya global `WHATSAPP_ACCESS_TOKEN` yeterli olabilir — kod ikisinden birini kullanır).
+
+ADIM 7 — İlk test
+-----------------
+• Kendi telefonundan **kayıtlı test numarasına** veya izinli alıcıya kısa bir mesaj at.
+• Panel **Gelen kutusu**nda konuşma görünmeli.
+• Operatörden cevap yaz → **DEMO_MOCK_SEND=false** ve token doğruysa Meta üzerinden gider.
+
+Notlar
+------
+• İlk iletişim / 24 saat penceresi dışı: Meta’da **onaylı şablon (template)** gerekir; panelde
+  şablon gönderimi buna bağlıdır.
+• WHATSAPP_APP_SECRET boşsa webhook POST’u imzasız kabul edilir (güvensiz); doldur.
+• Sorun giderme: `/api/health`, `docker compose logs app`, Meta Webhook’larda “Son teslimatlar”.
+
+(Dosya yolu örnekleri /opt/ecychat — kendi sunucu yolunla değiştir.)
