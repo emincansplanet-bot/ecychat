@@ -76,6 +76,23 @@ GET /api/admin/export/audit). Özet: GET /api/dashboard/stats (yöneticide yayı
 BroadcastLog toplamları + son çalıştırma). Production’da sabit
 webhook adresi için NEXT_PUBLIC_APP_URL veya AUTH_URL önerilir; Meta’da WHATSAPP_VERIFY_TOKEN aynı olmalı.
 
+HTTPS nginx / Cloudflare → app:3000 arkasında giriş “MissingCSRF” veriyorsa:
+  • docker-compose.prod.yml: AUTH_TRUST_HOST=true (ortamda sabit).
+  • .env: AUTH_URL, NEXTAUTH_URL, NEXT_PUBLIC_APP_URL = tarayıcıdaki kök (örn. https://panel.ornek.com).
+  • nginx location / içinde mutlaka iletilsin (TLS Cloudflare’da bile proto doğru olsun):
+
+    proxy_set_header Host              $host;
+    proxy_set_header X-Real-IP         $remote_addr;
+    proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-Host  $host;
+
+  Cloudflare → sunucu HTTP ise $scheme bazen http kalır; o zaman örn.:
+
+    proxy_set_header X-Forwarded-Proto $http_x_forwarded_proto;
+
+  (veya origin’de yalnızca HTTPS varsa doğrudan https.)
+
 Sağlık kontrolü (auth yok): GET /api/health — veritabanı: GET /api/health?db=1
 
 Devre dışı kullanıcı: panel layout + tüm oturumlu API’ler 403; oturum kapatılır, /login?error=deactivated.
