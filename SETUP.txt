@@ -115,6 +115,10 @@ PrismaClientValidationError: Unknown field `graphApiAccessToken`
 
 ---
 
+VPS `.env` tek komut (URL + seed şablonu; mevcut POSTGRES_PASSWORD / AUTH_SECRET korunur):
+  `cd /opt/ecychat && chmod +x scripts/write-vps-dotenv.sh && ./scripts/write-vps-dotenv.sh panel.ecychat.xyz`
+  Sonra: `./scripts/seed-docker.sh` ve `docker compose -f docker-compose.prod.yml up -d`
+
 Hosting / canlıya alma (özet)
 -----------------------------
 Evet: müşteri ve Meta webhook’un panele ulaşması için uygulamanın **sürekli çalıştığı bir sunucu**
