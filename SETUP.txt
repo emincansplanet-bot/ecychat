@@ -103,9 +103,8 @@ Giriş (seed sonrası):
   `.env` içindeki SEED_ADMIN_EMAIL / SEED_OPERATOR_EMAIL ve SEED_ADMIN_PASSWORD (`.env.example`da örnek rastgele değerler var).
   Bu üçlüyü tanımlamazsan: admin@ecychat.local / operator@ecychat.local ve şifre changeme123.
 
-Şifresiz “kapı açık” mod (sadece güvenilir ortam / demo): `ECYCHAT_OPEN_PANEL=true` (+ seed’de en az bir aktif yönetici).
-  Ana sayfa/ /login doğrudan panele gider; oturum çerezi olmadan sunucu ilk admin kullanıcısını taklit eder.
-  İnternete açık VPS’te bu değişkeni false bırak veya hiç tanımlama.
+Şifresiz panel varsayılan: `.env` olmadan da doğrudan dashboard (ilk aktif yönetici taklidi); seed’de admin olmalı.
+  Şifreli giriş için: `ECYCHAT_OPEN_PANEL=false` (veya docker compose ortamında false).
 
 Operatör: sadece atanmış demo sohbeti görür. Gelen kutusu: Açık / Arşiv, Tümü / Yanıtsız / (yönetici) Atanmamış, arama, etiket.
 Yönetici: tüm sohbetler + Meta ID (varsa).

@@ -56,7 +56,7 @@ const { handlers, auth: authConfigured, signIn, signOut } = NextAuth({
   ],
 });
 
-/** Sunucu bileşenleri / API: ECYCHAT_OPEN_PANEL=true iken şifresiz ilk yönetici oturumu. */
+/** Sunucu bileşenleri / API: varsayılan şifresiz panel (false ile kapatılır). */
 export async function auth() {
   const open = await getSessionIfOpenPanel();
   if (open) return open;

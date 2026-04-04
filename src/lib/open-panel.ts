@@ -2,10 +2,14 @@ import { UserRole } from "@prisma/client";
 import type { Session } from "next-auth";
 import { prisma } from "@/lib/prisma";
 
-/** Kapı açık mod: giriş ekranı yok; ilk aktif yönetici olarak oturum taklidi (sadece güvenilir ortamda). */
+/**
+ * Varsayılan: açık (şifresiz, doğrudan dashboard — ilk aktif yönetici taklidi).
+ * Kapatmak için: ECYCHAT_OPEN_PANEL=false veya 0.
+ */
 export function isOpenPanel(): boolean {
-  const v = process.env.ECYCHAT_OPEN_PANEL;
-  return v === "true" || v === "1";
+  const v = process.env.ECYCHAT_OPEN_PANEL?.trim().toLowerCase();
+  if (v === "false" || v === "0" || v === "no" || v === "off") return false;
+  return true;
 }
 
 export async function getSessionIfOpenPanel(): Promise<Session | null> {
