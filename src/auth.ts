@@ -3,6 +3,7 @@ import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { getSessionIfOpenPanel } from "@/lib/open-panel";
 import authConfig from "./auth.config";
 
 const credentialsSchema = z.object({
@@ -13,7 +14,7 @@ const credentialsSchema = z.object({
   password: z.string().min(1),
 });
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
+const { handlers, auth: authConfigured, signIn, signOut } = NextAuth({
   ...authConfig,
   providers: [
     Credentials({
@@ -54,3 +55,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
 });
+
+/** Sunucu bileşenleri / API: ECYCHAT_OPEN_PANEL=true iken şifresiz ilk yönetici oturumu. */
+export async function auth() {
+  const open = await getSessionIfOpenPanel();
+  if (open) return open;
+  return authConfigured();
+}
+
+export { handlers, signIn, signOut };

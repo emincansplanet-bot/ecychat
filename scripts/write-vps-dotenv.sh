@@ -55,6 +55,9 @@ WHATSAPP_TEMPLATE_NAME=
 WHATSAPP_TEMPLATE_LANGUAGE=tr
 
 REDIS_URL=redis://redis:6379
+
+# Şifresiz panel (yalnızca güvenilir ağ / demo). Kapatmak için: false
+ECYCHAT_OPEN_PANEL=true
 EOF
 
 echo "Yazıldı: ${ENV_FILE}"

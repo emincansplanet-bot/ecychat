@@ -42,6 +42,8 @@ services:
       WHATSAPP_ACCESS_TOKEN: ${WHATSAPP_ACCESS_TOKEN:-}
       WHATSAPP_API_VERSION: ${WHATSAPP_API_VERSION:-v22.0}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      # true = şifresiz panel (ilk admin). İnternete açık sunucuda false tut.
+      ECYCHAT_OPEN_PANEL: ${ECYCHAT_OPEN_PANEL:-false}
     depends_on:
       db:
         condition: service_healthy
