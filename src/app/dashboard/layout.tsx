@@ -1,5 +1,8 @@
 import Link from "next/link";
 import { auth, signOut } from "@/auth";
+
+/** Build (Docker) sırasında DB yok; dashboard’u SSG etme — Prisma çağrıları patlamasın. */
+export const dynamic = "force-dynamic";
 import { NotificationPrompt } from "@/components/notification-prompt";
 import { RealtimeBridge } from "@/components/realtime-bridge";
 import { prisma } from "@/lib/prisma";

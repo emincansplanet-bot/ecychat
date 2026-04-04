@@ -14,19 +14,24 @@ export function isOpenPanel(): boolean {
 
 export async function getSessionIfOpenPanel(): Promise<Session | null> {
   if (!isOpenPanel()) return null;
-  const admin = await prisma.user.findFirst({
-    where: { role: UserRole.ADMIN, active: true },
-    orderBy: { createdAt: "asc" },
-  });
-  if (!admin) return null;
-  return {
-    expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-    user: {
-      id: admin.id,
-      email: admin.email,
-      name: admin.name ?? admin.email,
-      role: admin.role as "ADMIN" | "OPERATOR",
-      organizationId: admin.organizationId,
-    },
-  };
+  try {
+    const admin = await prisma.user.findFirst({
+      where: { role: UserRole.ADMIN, active: true },
+      orderBy: { createdAt: "asc" },
+    });
+    if (!admin) return null;
+    return {
+      expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      user: {
+        id: admin.id,
+        email: admin.email,
+        name: admin.name ?? admin.email,
+        role: admin.role as "ADMIN" | "OPERATOR",
+        organizationId: admin.organizationId,
+      },
+    };
+  } catch {
+    /* Docker build / DB kapalı: Prisma yok say; auth() normal akışa düşer. */
+    return null;
+  }
 }
