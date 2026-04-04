@@ -142,7 +142,7 @@ async function main() {
   });
 
   const adminUser = await prisma.user.findUnique({
-    where: { email: "admin@ecychat.local" },
+    where: { email: adminEmail },
   });
   if (adminUser) {
     await prisma.message.upsert({

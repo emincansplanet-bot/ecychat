@@ -99,9 +99,9 @@ Devre dışı kullanıcı: panel layout + tüm oturumlu API’ler 403; oturum ka
 
 Tarayıcı: http://localhost:3000
 
-Giriş:
-  admin@ecychat.local  veya  operator@ecychat.local
-  Şifre: changeme123  (veya SEED_ADMIN_PASSWORD)
+Giriş (seed sonrası):
+  `.env` içindeki SEED_ADMIN_EMAIL / SEED_OPERATOR_EMAIL ve SEED_ADMIN_PASSWORD (`.env.example`da örnek rastgele değerler var).
+  Bu üçlüyü tanımlamazsan: admin@ecychat.local / operator@ecychat.local ve şifre changeme123.
 
 Operatör: sadece atanmış demo sohbeti görür. Gelen kutusu: Açık / Arşiv, Tümü / Yanıtsız / (yönetici) Atanmamış, arama, etiket.
 Yönetici: tüm sohbetler + Meta ID (varsa).
@@ -142,8 +142,9 @@ Canlıya alma — Docker Compose (özet)
    — `app` konteyneri açılışta `prisma migrate deploy` çalıştırır, sonra `node server.js`.
 4) **İlk yönetici:** VPS’te Node/tsx gerekmez — bir kez:
    `chmod +x scripts/seed-docker.sh && ./scripts/seed-docker.sh`
-   (`.env` içinde `POSTGRES_PASSWORD`; stack `up` iken). Giriş: `admin@ecychat.local` /
-   `SEED_ADMIN_PASSWORD` veya `changeme123`. Alternatif: güvenli ağda yerelden
+   (`.env` içinde `POSTGRES_PASSWORD`; stack `up` iken). Giriş: `.env` içindeki `SEED_ADMIN_EMAIL` /
+   `SEED_OPERATOR_EMAIL` ve `SEED_ADMIN_PASSWORD` (`.env.example` örnekleri). Tanımlı değilse
+   `admin@ecychat.local` / `changeme123`. Alternatif: güvenli ağda yerelden
    `DATABASE_URL=postgresql://ecychat:ŞİFRE@… npm run db:seed`.
 5) Sağlık: `https://SİZİN_ADRES/api/health` ve `?db=1` (DB ping).
 6) Meta webhook callback URL: `https://SİZİN_ADRES/api/webhooks/whatsapp` — `WHATSAPP_VERIFY_TOKEN` aynı olmalı.

@@ -48,7 +48,7 @@ function LoginForm() {
         );
       } else {
         setError(
-          "E-posta veya şifre hatalı — ya da henüz kullanıcı yok. İlk kurulum: terminalde npm run db:seed (admin@ecychat.local / changeme123).",
+          "E-posta veya şifre hatalı — ya da henüz kullanıcı yok. İlk kurulum: .env içindeki SEED_* ile npm run db:seed veya ./scripts/seed-docker.sh.",
         );
       }
       return;
@@ -88,7 +88,8 @@ function LoginForm() {
           </p>
         </div>
         <p className="text-xs text-emerald-200/70">
-          admin@ecychat.local · operator@ecychat.local — şifre: changeme123
+          Giriş: .env içindeki SEED_ADMIN_EMAIL / SEED_OPERATOR_EMAIL ve SEED_ADMIN_PASSWORD
+          (tanımlı değilse admin@ecychat.local / changeme123)
         </p>
       </div>
 
