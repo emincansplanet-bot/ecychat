@@ -8,7 +8,7 @@ import { ExportMessagesForm } from "@/components/export-messages-form";
 export default async function ExportPage() {
   const session = await auth();
   const user = session?.user;
-  if (!user?.organizationId) redirect("/login");
+  if (!user?.organizationId) redirect("/dashboard");
   if (user.role !== "ADMIN") redirect("/dashboard");
 
   return (

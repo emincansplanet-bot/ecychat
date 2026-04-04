@@ -6,7 +6,7 @@ import { AdminMessageSearch } from "@/components/admin-message-search";
 export default async function AdminSearchPage() {
   const session = await auth();
   const user = session?.user;
-  if (!user?.organizationId) redirect("/login");
+  if (!user?.organizationId) redirect("/dashboard");
   if (user.role !== "ADMIN") redirect("/dashboard");
 
   return (

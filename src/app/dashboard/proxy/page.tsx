@@ -5,7 +5,7 @@ import { requireAdmin, requireOrg } from "@/lib/authz";
 
 export default async function ProxyInfoPage() {
   const session = await auth();
-  if (!requireOrg(session)) redirect("/login");
+  if (!requireOrg(session)) redirect("/dashboard");
   if (!requireAdmin(session)) redirect("/dashboard");
 
   return (

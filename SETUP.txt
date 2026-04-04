@@ -95,16 +95,14 @@ HTTPS nginx / Cloudflare → app:3000 arkasında giriş “MissingCSRF” veriyo
 
 Sağlık kontrolü (auth yok): GET /api/health — veritabanı: GET /api/health?db=1
 
-Devre dışı kullanıcı: panel layout + tüm oturumlu API’ler 403; oturum kapatılır, /login?error=deactivated.
+Devre dışı kullanıcı: panel layout + tüm oturumlu API’ler 403; oturum kapatılır, panele yönlendirilir.
 
 Tarayıcı: http://localhost:3000
 
-Giriş (seed sonrası):
-  `.env` içindeki SEED_ADMIN_EMAIL / SEED_OPERATOR_EMAIL ve SEED_ADMIN_PASSWORD (`.env.example`da örnek rastgele değerler var).
-  Bu üçlüyü tanımlamazsan: admin@ecychat.local / operator@ecychat.local ve şifre changeme123.
+Arayüzde ayrı giriş sayfası yok: `/` ve `/login` doğrudan `/dashboard`’a gider (şifresiz mod varsayılan; seed’de aktif yönetici olmalı).
+  Şifreli klasik giriş istersen: `ECYCHAT_OPEN_PANEL=false` + giriş sayfasını geri eklemen gerekir (bu repo sürümü girişi kaldırdı).
 
-Şifresiz panel varsayılan: `.env` olmadan da doğrudan dashboard (ilk aktif yönetici taklidi); seed’de admin olmalı.
-  Şifreli giriş için: `ECYCHAT_OPEN_PANEL=false` (veya docker compose ortamında false).
+Seed / ilk kullanıcı: `./scripts/seed-docker.sh` veya `npm run db:seed` (e-posta/şifre `.env` / `SEED_*`).
 
 Operatör: sadece atanmış demo sohbeti görür. Gelen kutusu: Açık / Arşiv, Tümü / Yanıtsız / (yönetici) Atanmamış, arama, etiket.
 Yönetici: tüm sohbetler + Meta ID (varsa).

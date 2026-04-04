@@ -18,7 +18,7 @@ function chipClass(active: boolean) {
 export default async function AuditPage({ searchParams }: PageProps) {
   const session = await auth();
   const user = session?.user;
-  if (!user?.organizationId) redirect("/login");
+  if (!user?.organizationId) redirect("/dashboard");
   if (user.role !== "ADMIN") redirect("/dashboard");
 
   const sp = await searchParams;

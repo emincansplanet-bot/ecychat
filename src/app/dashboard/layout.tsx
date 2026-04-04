@@ -27,7 +27,21 @@ export default async function DashboardLayout({
   children: React.ReactNode;
 }) {
   const session = await auth();
-  if (!session?.user?.id) redirect("/login");
+  if (!session?.user?.id) {
+    return (
+      <div className="flex min-h-full items-center justify-center bg-zinc-100 p-8">
+        <div className="max-w-md rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+          <h1 className="text-lg font-semibold text-zinc-900">Kurulum</h1>
+          <p className="mt-2 text-sm text-zinc-600">
+            Aktif yönetici bulunamadı. Sunucuda bir kez çalıştırın:{" "}
+            <code className="rounded bg-zinc-100 px-1.5 py-0.5 text-xs">
+              ./scripts/seed-docker.sh
+            </code>
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   let dbUser: { active: boolean } | null;
   try {
@@ -36,11 +50,11 @@ export default async function DashboardLayout({
       select: { active: true },
     });
   } catch {
-    redirect("/login?error=database");
+    redirect("/dashboard");
   }
   if (!dbUser?.active) {
-    await signOut({ redirectTo: "/login?error=deactivated" });
-    redirect("/login?error=deactivated");
+    await signOut({ redirectTo: "/dashboard" });
+    redirect("/dashboard");
   }
 
   const isAdmin = session.user.role === "ADMIN";
@@ -80,7 +94,7 @@ export default async function DashboardLayout({
             className="mt-3"
             action={async () => {
               "use server";
-              await signOut({ redirectTo: "/login" });
+              await signOut({ redirectTo: "/dashboard" });
             }}
           >
             <button
@@ -112,7 +126,7 @@ export default async function DashboardLayout({
               <form
                 action={async () => {
                   "use server";
-                  await signOut({ redirectTo: "/login" });
+                  await signOut({ redirectTo: "/dashboard" });
                 }}
               >
                 <button

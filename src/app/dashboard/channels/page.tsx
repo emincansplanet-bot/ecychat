@@ -8,7 +8,7 @@ import { redirect } from "next/navigation";
 
 export default async function ChannelsPage() {
   const session = await auth();
-  if (!requireOrg(session)) redirect("/login");
+  if (!requireOrg(session)) redirect("/dashboard");
   if (!requireAdmin(session)) redirect("/dashboard");
 
   const channels = await prisma.whatsAppChannel.findMany({

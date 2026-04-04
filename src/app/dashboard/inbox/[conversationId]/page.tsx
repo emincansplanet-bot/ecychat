@@ -32,7 +32,7 @@ export default async function ConversationPage({ params, searchParams }: PagePro
   const inboxListHref = inboxListPathFromSearchParams(sp);
   const session = await auth();
   const user = session?.user;
-  if (!user?.organizationId) redirect("/login");
+  if (!user?.organizationId) redirect("/dashboard");
 
   const conv = await getConversationForUser({
     organizationId: user.organizationId,

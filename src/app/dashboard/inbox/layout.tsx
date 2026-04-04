@@ -10,7 +10,7 @@ export default async function InboxLayout({
 }) {
   const session = await auth();
   const user = session?.user;
-  if (!user?.organizationId) redirect("/login");
+  if (!user?.organizationId) redirect("/dashboard");
 
   return (
     <Suspense
