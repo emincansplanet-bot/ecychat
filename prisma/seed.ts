@@ -6,6 +6,11 @@ const prisma = new PrismaClient();
 async function main() {
   const password = process.env.SEED_ADMIN_PASSWORD ?? "changeme123";
   const passwordHash = await bcrypt.hash(password, 12);
+  const adminEmail =
+    process.env.SEED_ADMIN_EMAIL?.trim().toLowerCase() || "admin@ecychat.local";
+  const operatorEmail =
+    process.env.SEED_OPERATOR_EMAIL?.trim().toLowerCase() ||
+    "operator@ecychat.local";
 
   const org = await prisma.organization.upsert({
     where: { id: "seed-org-ecychat" },
@@ -17,9 +22,9 @@ async function main() {
   });
 
   await prisma.user.upsert({
-    where: { email: "admin@ecychat.local" },
+    where: { email: adminEmail },
     create: {
-      email: "admin@ecychat.local",
+      email: adminEmail,
       passwordHash,
       name: "Admin",
       role: UserRole.ADMIN,
@@ -33,9 +38,9 @@ async function main() {
   });
 
   await prisma.user.upsert({
-    where: { email: "operator@ecychat.local" },
+    where: { email: operatorEmail },
     create: {
-      email: "operator@ecychat.local",
+      email: operatorEmail,
       passwordHash,
       name: "Operatör",
       role: UserRole.OPERATOR,
@@ -196,8 +201,8 @@ async function main() {
     ],
   });
 
-  console.log("Seed OK — admin@ecychat.local / operator@ecychat.local");
-  console.log("Password from SEED_ADMIN_PASSWORD or default: changeme123");
+  console.log(`Seed OK — admin: ${adminEmail} / operatör: ${operatorEmail}`);
+  console.log("Şifre her iki hesap için SEED_ADMIN_PASSWORD (yoksa changeme123).");
   console.log("Demo konuşma: gelen kutusunda görünür (operatöre atanmış).");
 }
 

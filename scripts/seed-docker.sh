@@ -34,6 +34,8 @@ set +a
 PASS="${POSTGRES_PASSWORD:?POSTGRES_PASSWORD .env içinde tanımlı olmalı}"
 URL="postgresql://ecychat:${PASS}@db:5432/ecychat?schema=public"
 SEED_PW="${SEED_ADMIN_PASSWORD:-changeme123}"
+SEED_ADMIN_MAIL="${SEED_ADMIN_EMAIL:-}"
+SEED_OPERATOR_MAIL="${SEED_OPERATOR_EMAIL:-}"
 
 echo "Seed çalışıyor (ağ: $NET) …"
 
@@ -43,6 +45,8 @@ docker run --rm \
   -w /app \
   -e "DATABASE_URL=$URL" \
   -e "SEED_ADMIN_PASSWORD=$SEED_PW" \
+  -e "SEED_ADMIN_EMAIL=$SEED_ADMIN_MAIL" \
+  -e "SEED_OPERATOR_EMAIL=$SEED_OPERATOR_MAIL" \
   -e "SEED_META_PHONE_NUMBER_ID=${SEED_META_PHONE_NUMBER_ID:-}" \
   node:20-bookworm-slim \
   bash -lc 'set -euo pipefail
@@ -52,4 +56,6 @@ docker run --rm \
     npx prisma generate
     npx tsx prisma/seed.ts'
 
-echo "Tamam. Giriş: admin@ecychat.local (veya operator@ecychat.local) / şifre: ${SEED_PW}"
+A_DISP="${SEED_ADMIN_MAIL:-admin@ecychat.local}"
+O_DISP="${SEED_OPERATOR_MAIL:-operator@ecychat.local}"
+echo "Tamam. Giriş: ${A_DISP} (yönetici) veya ${O_DISP} (operatör) / şifre: ${SEED_PW}"
