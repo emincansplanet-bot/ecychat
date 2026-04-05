@@ -3,7 +3,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireActiveOrgSession } from "@/lib/api-session";
 import { logAudit } from "@/lib/audit";
-import { requireAdmin } from "@/lib/authz";
+import { canAssignConversations } from "@/lib/authz";
+import { isWithinOnDutyWindow } from "@/lib/on-duty-schedule";
 import { prisma } from "@/lib/prisma";
 import { notifyInbox } from "@/lib/realtime-notify";
 
@@ -17,8 +18,18 @@ export async function POST(req: Request, context: RouteContext) {
   const gate = await requireActiveOrgSession();
   if (!gate.ok) return gate.response;
   const session = gate.session;
-  if (!requireAdmin(session)) {
+  if (!canAssignConversations(session)) {
     return NextResponse.json({ error: "Yetkisiz" }, { status: 403 });
+  }
+
+  if (session.user.role === "NOBETCI") {
+    const actor = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { onDutySchedule: true },
+    });
+    if (!isWithinOnDutyWindow(actor?.onDutySchedule ?? null, new Date())) {
+      return NextResponse.json({ error: "Nöbet saati dışında atama yapılamaz" }, { status: 403 });
+    }
   }
 
   const { conversationId } = await context.params;

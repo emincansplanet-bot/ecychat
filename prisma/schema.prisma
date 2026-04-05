@@ -10,11 +10,14 @@ datasource db {
 enum UserRole {
   ADMIN
   OPERATOR
+  NOBETCI
 }
 
 model Organization {
   id             String          @id @default(cuid())
   name           String
+  /// Hangi roller (ADMIN hariç) müşteri waId ve konuşma başlığındaki Meta phone id özetini tam görsün. JSON string dizisi: ["OPERATOR","NOBETCI"]. Boş/null = yalnız yönetici (+ kullanıcı bazlı izin).
+  privacyPhoneRevealRoles Json?
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
   users          User[]
@@ -35,6 +38,10 @@ model User {
   passwordHash   String
   name           String?
   role           UserRole
+  /// Nöbetçi rolü: `[{ "dow": 0-6 (Pazar=0), "start": "09:00", "end": "18:00" }]`, sunucu yerel saati.
+  onDutySchedule Json?
+  /// Yönetici onayı: rol politikası kapalı olsa da bu kullanıcı tam GSM / hat kimliği görür.
+  privacyRevealWaIdOverride Boolean @default(false)
   active         Boolean      @default(true)
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt

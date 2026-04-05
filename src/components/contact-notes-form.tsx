@@ -15,7 +15,7 @@ export function ContactNotesForm({
   displayName: string;
   notes: string;
   tags: string[];
-  role: "ADMIN" | "OPERATOR";
+  role: "ADMIN" | "OPERATOR" | "NOBETCI";
 }) {
   const router = useRouter();
   const [name, setName] = useState(displayName);

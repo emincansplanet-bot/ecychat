@@ -10,6 +10,8 @@ export default async function DashboardPage() {
   const session = await auth();
   const user = session?.user;
   const isAdmin = user?.role === "ADMIN";
+  const isNobetc = user?.role === "NOBETCI";
+  const canSeeUnassignedNav = isAdmin || isNobetc;
 
   const stats =
     user?.organizationId && user.id && user.role
@@ -26,6 +28,13 @@ export default async function DashboardPage() {
         <h1 className="text-2xl font-semibold text-zinc-900">Özet</h1>
         <p className="mt-1 text-sm text-zinc-500">{user?.name ?? user?.email}</p>
       </div>
+
+      {isNobetc && stats && stats.shiftActive === false ? (
+        <div className="mb-6 rounded-2xl border border-amber-200/90 bg-amber-50/80 px-4 py-3 text-sm text-amber-950">
+          Şu an nöbet saatiniz dışındasınız. Gelen kutusu ve özet yalnızca tanımlı gün/saat
+          aralığında yanıt bekleyen konuşmalar için açılır.
+        </div>
+      ) : null}
 
       {stats ? (
         <>
@@ -139,23 +148,61 @@ export default async function DashboardPage() {
               </table>
             </div>
 
-            {isAdmin && stats.operatorOutboundToday.length > 0 ? (
+            {isAdmin && stats.operatorActivityToday.length > 0 ? (
               <div className="mt-8 overflow-x-auto">
-                <h3 className="mb-3 text-sm font-semibold text-zinc-800">
-                  Bugün operatör giden mesaj (üst sıralar)
+                <h3 className="mb-1 text-sm font-semibold text-zinc-800">
+                  Operatör özeti (bugün)
                 </h3>
-                <table className="w-full min-w-[280px] text-left text-sm">
+                <p className="mb-3 text-xs text-zinc-500">
+                  Gelen: mesaj geldiğinde o konuşmada atanmış olan kullanıcı. Giden: mesajı gönderen
+                  kullanıcı. Açık atama: şu an üzerinde olan açık konuşmalar.
+                  {stats.operatorActivityToday[0]?.messagesToday ? (
+                    <>
+                      {" "}
+                      En yoğun:{" "}
+                      <span className="font-medium text-zinc-700">
+                        {stats.operatorActivityToday[0].name}
+                      </span>{" "}
+                      ({stats.operatorActivityToday[0].messagesToday} mesaj).
+                    </>
+                  ) : null}
+                </p>
+                <table className="w-full min-w-[480px] text-left text-sm">
                   <thead className="border-b border-zinc-200 text-xs uppercase text-zinc-500">
                     <tr>
-                      <th className="py-2 pr-4 font-medium">Operatör</th>
-                      <th className="py-2 font-medium">Giden</th>
+                      <th className="py-2 pr-4 font-medium">Kullanıcı</th>
+                      <th className="py-2 pr-4 font-medium">Rol</th>
+                      <th className="py-2 pr-4 text-right font-medium">Açık atama</th>
+                      <th className="py-2 pr-4 text-right font-medium">Gelen</th>
+                      <th className="py-2 pr-4 text-right font-medium">Giden</th>
+                      <th className="py-2 text-right font-medium">Toplam</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-100">
-                    {stats.operatorOutboundToday.map((op) => (
-                      <tr key={op.userId}>
-                        <td className="py-2 pr-4 text-zinc-800">{op.name || op.email}</td>
-                        <td className="py-2 tabular-nums text-zinc-900">{op.outbound}</td>
+                    {stats.operatorActivityToday.map((op, i) => (
+                      <tr
+                        key={op.userId}
+                        className={i === 0 && op.messagesToday > 0 ? "bg-emerald-50/50" : undefined}
+                      >
+                        <td className="py-2 pr-4 text-zinc-800">
+                          {op.name}
+                          <span className="mt-0.5 block text-[11px] text-zinc-400">{op.email}</span>
+                        </td>
+                        <td className="py-2 pr-4 text-zinc-600">
+                          {op.role === "NOBETCI" ? "Nöbetçi" : "Operatör"}
+                        </td>
+                        <td className="py-2 pr-4 text-right tabular-nums text-zinc-900">
+                          {op.openAssigned}
+                        </td>
+                        <td className="py-2 pr-4 text-right tabular-nums text-zinc-800">
+                          {op.inboundToday}
+                        </td>
+                        <td className="py-2 pr-4 text-right tabular-nums text-zinc-800">
+                          {op.outboundToday}
+                        </td>
+                        <td className="py-2 text-right tabular-nums font-medium text-zinc-900">
+                          {op.messagesToday}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -250,7 +297,7 @@ export default async function DashboardPage() {
                 Yanıtsızlar
               </Link>
             ) : null}
-            {isAdmin ? (
+            {canSeeUnassignedNav ? (
               <Link
                 href={unassignedInboxHref}
                 className="inline-flex rounded-lg border border-sky-200 bg-sky-50/80 px-4 py-2 text-sm font-medium text-sky-900 hover:bg-sky-100"

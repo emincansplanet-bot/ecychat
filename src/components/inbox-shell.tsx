@@ -29,11 +29,15 @@ function inboxParts(
   };
 }
 
+function adminLikeInbox(role: "ADMIN" | "OPERATOR" | "NOBETCI"): boolean {
+  return role === "ADMIN" || role === "NOBETCI";
+}
+
 export function InboxShell({
   role,
   children,
 }: {
-  role: "ADMIN" | "OPERATOR";
+  role: "ADMIN" | "OPERATOR" | "NOBETCI";
   children: React.ReactNode;
 }) {
   const searchParams = useSearchParams();
@@ -130,7 +134,9 @@ export function InboxShell({
             ? "Arşivlenmiş konuşmalar"
             : role === "ADMIN"
               ? "Açık konuşmalar — yönetici görünümü"
-              : "Size atanmış açık konuşmalar"}
+              : role === "NOBETCI"
+                ? "Nöbet saatinde — yanıt bekleyen açık konuşmalar"
+                : "Size atanmış açık konuşmalar"}
         </p>
 
         <div className="mt-3 flex flex-wrap gap-2">
@@ -155,7 +161,7 @@ export function InboxShell({
           >
             Yanıtsız
           </Link>
-          {role === "ADMIN" ? (
+          {adminLikeInbox(role) ? (
             <Link
               href={scope === "archived" ? archivedUnassignedHref : openUnassignedHref}
               className={tabClass(filter === "unassigned")}

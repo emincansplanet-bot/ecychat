@@ -17,7 +17,8 @@ import {
 import { normalizeContactTagsJson } from "@/lib/contact-tags";
 import { inboxListPathFromSearchParams } from "@/lib/inbox-filters";
 import { listOperators, listPromotions, listQuickReplies } from "@/lib/org-content";
-import { contactDisplayLabel } from "@/lib/privacy";
+import { resolveCustomerPhoneReveal } from "@/lib/org-privacy";
+import { contactDisplayLabel, maskWaId } from "@/lib/privacy";
 import { prisma } from "@/lib/prisma";
 import { MessageDirection } from "@prisma/client";
 
@@ -56,12 +57,19 @@ export default async function ConversationPage({ params, searchParams }: PagePro
     }
   }
 
+  const revealCustomerPhone = await resolveCustomerPhoneReveal({
+    organizationId: user.organizationId,
+    userId: user.id,
+    role: user.role,
+  });
   const title = contactDisplayLabel(
     conv.contact.displayName,
     conv.contact.waId,
-    user.role,
+    revealCustomerPhone,
   );
   const contactTags = normalizeContactTagsJson(conv.contact.tags);
+  const customerWaSubtitle =
+    revealCustomerPhone ? conv.contact.waId : maskWaId(conv.contact.waId);
 
   const ch = await prisma.whatsAppChannel.findFirst({
     where: { id: conv.channelId, organizationId: user.organizationId },
@@ -120,6 +128,11 @@ export default async function ConversationPage({ params, searchParams }: PagePro
               <div className="min-w-0">
                 <h2 className="truncate text-lg font-semibold text-zinc-900">{title}</h2>
                 <p className="text-sm text-zinc-500">{conv.channel.internalLabel}</p>
+                {conv.contact.displayName?.trim() ? (
+                  <p className="mt-0.5 font-mono text-[11px] text-zinc-400">
+                    WhatsApp: {customerWaSubtitle}
+                  </p>
+                ) : null}
                 {contactTags.length ? (
                   <div className="mt-1.5 flex flex-wrap gap-1">
                     {contactTags.map((t) => (
@@ -135,7 +148,7 @@ export default async function ConversationPage({ params, searchParams }: PagePro
                 {isArchived ? (
                   <p className="mt-1 text-xs font-medium text-amber-800">Arşivde</p>
                 ) : null}
-                {user.role === "ADMIN" && conv.channel.metaPhoneNumberId ? (
+                {revealCustomerPhone && conv.channel.metaPhoneNumberId ? (
                   <p className="mt-0.5 font-mono text-[10px] text-zinc-400">
                     {conv.channel.metaPhoneNumberId}
                   </p>
@@ -170,7 +183,7 @@ export default async function ConversationPage({ params, searchParams }: PagePro
           />
         </div>
         <div className="space-y-4">
-          {user.role === "ADMIN" ? (
+          {user.role === "ADMIN" || user.role === "NOBETCI" ? (
             <ConversationAssignControl
               conversationId={conv.id}
               operators={operators}

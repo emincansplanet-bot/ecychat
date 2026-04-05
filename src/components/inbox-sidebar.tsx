@@ -22,7 +22,7 @@ export function InboxSidebar({
   listQuery = "",
 }: {
   items: InboxSidebarItem[];
-  role: "ADMIN" | "OPERATOR";
+  role: "ADMIN" | "OPERATOR" | "NOBETCI";
   /** Gelen kutusu filtrelerini konuşma URL’sinde koru (geri dönüş için) */
   listQuery?: string;
 }) {
@@ -74,10 +74,10 @@ export function InboxSidebar({
                   ))}
                 </div>
               ) : null}
-              {role === "ADMIN" && item.assignees ? (
+              {(role === "ADMIN" || role === "NOBETCI") && item.assignees ? (
                 <p className="mt-1 text-xs text-zinc-400">Atanan: {item.assignees}</p>
               ) : null}
-              {role === "ADMIN" && item.metaHint ? (
+              {(role === "ADMIN" || role === "NOBETCI") && item.metaHint ? (
                 <p className="mt-0.5 font-mono text-[10px] text-zinc-400">{item.metaHint}</p>
               ) : null}
             </Link>

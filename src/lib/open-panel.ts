@@ -26,7 +26,7 @@ export async function getSessionIfOpenPanel(): Promise<Session | null> {
         id: admin.id,
         email: admin.email,
         name: admin.name ?? admin.email,
-        role: admin.role as "ADMIN" | "OPERATOR",
+        role: admin.role as "ADMIN" | "OPERATOR" | "NOBETCI",
         organizationId: admin.organizationId,
       },
     };

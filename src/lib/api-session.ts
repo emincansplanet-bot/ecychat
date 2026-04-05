@@ -4,7 +4,7 @@ import type { Session } from "next-auth";
 import { isUserActive, requireOrg } from "@/lib/authz";
 
 export type ActiveOrgSession = Session & {
-  user: { id: string; organizationId: string; role: "ADMIN" | "OPERATOR" };
+  user: { id: string; organizationId: string; role: "ADMIN" | "OPERATOR" | "NOBETCI" };
 };
 
 /**

@@ -5,12 +5,12 @@ export function maskWaId(waId: string): string {
   return `••••${digits.slice(-4)}`;
 }
 
+/** Başlık metni: görünen ad varsa ad; yoksa tam veya maskeli waId. */
 export function contactDisplayLabel(
   displayName: string | null | undefined,
   waId: string,
-  role: "ADMIN" | "OPERATOR",
+  revealFullWaId: boolean,
 ): string {
   if (displayName?.trim()) return displayName.trim();
-  if (role === "ADMIN") return waId;
-  return maskWaId(waId);
+  return revealFullWaId ? waId : maskWaId(waId);
 }

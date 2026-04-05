@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireActiveOrgSession } from "@/lib/api-session";
 import { listConversationsForUser } from "@/lib/conversations";
 import { mapConversationRowsToInboxItems } from "@/lib/inbox-map";
+import { resolveCustomerPhoneReveal } from "@/lib/org-privacy";
 
 export async function GET(req: Request) {
   const gate = await requireActiveOrgSession();
@@ -32,15 +33,23 @@ export async function GET(req: Request) {
   }
 
   if (filter === "unassigned") {
-    if (session.user.role !== "ADMIN") {
+    const canSeeUnassigned = session.user.role === "ADMIN" || session.user.role === "NOBETCI";
+    if (!canSeeUnassigned) {
       rows = [];
     } else {
       rows = rows.filter((c) => c.assignments.length === 0);
     }
   }
 
+  const revealCustomerPhone = await resolveCustomerPhoneReveal({
+    organizationId: session.user.organizationId,
+    userId: session.user.id,
+    role: session.user.role,
+  });
+
   const items = mapConversationRowsToInboxItems(rows, {
     role: session.user.role,
+    revealCustomerPhone,
   });
 
   return NextResponse.json({ items });

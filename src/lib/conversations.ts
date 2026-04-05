@@ -1,6 +1,8 @@
 import type { ConversationStatus, UserRole } from "@prisma/client";
-import { Prisma } from "@prisma/client";
+import { Prisma, UserRole as UserRoleEnum } from "@prisma/client";
 import { normalizeContactTagsJson } from "@/lib/contact-tags";
+import { isConversationUnanswered } from "@/lib/conversation-unanswered";
+import { isWithinOnDutyWindow } from "@/lib/on-duty-schedule";
 import { prisma } from "@/lib/prisma";
 
 const conversationListArgs = Prisma.validator<Prisma.ConversationDefaultArgs>()({
@@ -40,7 +42,7 @@ function buildConversationListWhere(params: {
   const { organizationId, userId, role, status, searchQuery } = params;
 
   const base: Prisma.ConversationWhereInput =
-    role === "ADMIN"
+    role === "ADMIN" || role === UserRoleEnum.NOBETCI
       ? { organizationId, status }
       : {
           organizationId,
@@ -62,6 +64,20 @@ function buildConversationListWhere(params: {
   return { AND: [base, { OR: ors }] };
 }
 
+async function resolveNoBetcSchedule(
+  userId: string,
+  role: UserRole,
+  provided?: unknown,
+): Promise<unknown | null> {
+  if (role !== UserRoleEnum.NOBETCI) return null;
+  if (provided !== undefined) return provided ?? null;
+  const u = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { onDutySchedule: true },
+  });
+  return u?.onDutySchedule ?? null;
+}
+
 export async function listConversationsForUser(params: {
   organizationId: string;
   userId: string;
@@ -70,9 +86,18 @@ export async function listConversationsForUser(params: {
   searchQuery?: string;
   /** Tam eşleşme; müşteri kartı etiketlerinden biri */
   tag?: string;
+  /** Nöbetçi için önceden yüklenmiş takvim (yoksa DB’den okunur). */
+  onDutySchedule?: unknown;
+  now?: Date;
 }): Promise<ConversationListRow[]> {
   const { organizationId, userId, role } = params;
   const status = params.status ?? "OPEN";
+  const now = params.now ?? new Date();
+
+  if (role === UserRoleEnum.NOBETCI) {
+    const schedule = await resolveNoBetcSchedule(userId, role, params.onDutySchedule);
+    if (!isWithinOnDutyWindow(schedule, now)) return [];
+  }
 
   const where = buildConversationListWhere({
     organizationId,
@@ -82,11 +107,15 @@ export async function listConversationsForUser(params: {
     searchQuery: params.searchQuery,
   });
 
-  const rows = await prisma.conversation.findMany({
+  let rows = await prisma.conversation.findMany({
     where,
     orderBy: [{ lastMessageAt: "desc" }, { updatedAt: "desc" }],
     ...conversationListArgs,
   });
+
+  if (role === UserRoleEnum.NOBETCI) {
+    rows = rows.filter(isConversationUnanswered);
+  }
 
   const tag = params.tag?.trim();
   if (!tag) return rows;
@@ -98,8 +127,11 @@ export async function getConversationForUser(params: {
   userId: string;
   role: UserRole;
   conversationId: string;
+  onDutySchedule?: unknown;
+  now?: Date;
 }) {
   const { organizationId, userId, role, conversationId } = params;
+  const now = params.now ?? new Date();
 
   const conv = await prisma.conversation.findFirst({
     where: { id: conversationId, organizationId },
@@ -112,11 +144,24 @@ export async function getConversationForUser(params: {
         where: { unassignedAt: null },
         include: { user: { select: { id: true, name: true, email: true } } },
       },
+      messages: {
+        orderBy: { createdAt: "desc" },
+        take: 1,
+        select: { direction: true },
+      },
     },
   });
 
   if (!conv) return null;
-  if (role === "ADMIN") return conv;
+  if (role === UserRoleEnum.ADMIN) return conv;
+
+  if (role === UserRoleEnum.NOBETCI) {
+    const schedule = await resolveNoBetcSchedule(userId, role, params.onDutySchedule);
+    if (!isWithinOnDutyWindow(schedule, now)) return null;
+    if (conv.status !== "OPEN") return null;
+    if (!isConversationUnanswered(conv)) return null;
+    return conv;
+  }
 
   const isAssigned = conv.assignments.some((a) => a.userId === userId);
   if (!isAssigned) return null;

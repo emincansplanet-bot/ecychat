@@ -1,5 +1,10 @@
 import type { UserRole } from "@prisma/client";
-import { MessageDirection } from "@prisma/client";
+import {
+  MessageDirection,
+  Prisma,
+  UserRole as UserRoleEnum,
+} from "@prisma/client";
+import { isWithinOnDutyWindow } from "@/lib/on-duty-schedule";
 import { prisma } from "@/lib/prisma";
 
 function startOfLocalDay(d: Date): Date {
@@ -20,11 +25,18 @@ export type DaySeriesPoint = {
   outbound: number;
 };
 
-export type OperatorOutboundToday = {
+/** Yönetici paneli: operatör / nöbetçi günlük özet (gelen atama anına göre, giden gönderene göre). */
+export type OperatorActivityToday = {
   userId: string;
   name: string;
   email: string;
-  outbound: number;
+  role: "OPERATOR" | "NOBETCI";
+  /** Şu an kendisine atanmış açık konuşma sayısı */
+  openAssigned: number;
+  inboundToday: number;
+  outboundToday: number;
+  /** inboundToday + outboundToday — sıralama için */
+  messagesToday: number;
 };
 
 /** Yönetici: BroadcastLog üzerinden yayın özeti */
@@ -44,38 +56,71 @@ export type BroadcastDashboardSummary = {
   } | null;
 };
 
+function emptyDashboardStats(shiftActive: boolean) {
+  return {
+    openConversations: 0,
+    unansweredConversations: 0,
+    unassignedOpen: 0,
+    quickReplyCount: 0,
+    inboundToday: 0,
+    outboundToday: 0,
+    inboundYesterday: 0,
+    outboundYesterday: 0,
+    last7Days: [] as DaySeriesPoint[],
+    operatorActivityToday: [] as OperatorActivityToday[],
+    broadcastSummary: null as BroadcastDashboardSummary | null,
+    shiftActive,
+  };
+}
+
 export async function getDashboardStats(params: {
   organizationId: string;
   userId: string;
   role: UserRole;
+  onDutySchedule?: unknown;
+  now?: Date;
 }) {
   const { organizationId, userId, role } = params;
-
-  const now = new Date();
+  const now = params.now ?? new Date();
   const todayStart = startOfLocalDay(now);
   const yesterdayStart = new Date(todayStart);
   yesterdayStart.setDate(yesterdayStart.getDate() - 1);
   const yesterdayEnd = new Date(todayStart);
   yesterdayEnd.setMilliseconds(-1);
 
-  const convWhere =
-    role === "ADMIN"
-      ? { organizationId, status: "OPEN" as const }
-      : {
-          organizationId,
-          status: "OPEN" as const,
-          assignments: { some: { userId, unassignedAt: null } },
-        };
+  let dutySchedule: unknown | null = params.onDutySchedule ?? null;
+  if (role === UserRoleEnum.NOBETCI && params.onDutySchedule === undefined) {
+    const u = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { onDutySchedule: true },
+    });
+    dutySchedule = u?.onDutySchedule ?? null;
+  }
 
-  const msgScope =
-    role === "ADMIN"
-      ? { conversation: { organizationId } }
-      : {
-          conversation: {
-            organizationId,
-            assignments: { some: { userId, unassignedAt: null } },
-          },
-        };
+  if (role === UserRoleEnum.NOBETCI) {
+    if (!dutySchedule || !isWithinOnDutyWindow(dutySchedule, now)) {
+      return emptyDashboardStats(false);
+    }
+  }
+
+  const adminScope = role === UserRoleEnum.ADMIN || role === UserRoleEnum.NOBETCI;
+
+  const convWhere = adminScope
+    ? { organizationId, status: "OPEN" as const }
+    : {
+        organizationId,
+        status: "OPEN" as const,
+        assignments: { some: { userId, unassignedAt: null } },
+      };
+
+  const msgScope = adminScope
+    ? { conversation: { organizationId } }
+    : {
+        conversation: {
+          organizationId,
+          assignments: { some: { userId, unassignedAt: null } },
+        },
+      };
 
   const [openConversations, quickReplyCount, convRows, inboundToday, outboundToday, unassignedOpen] =
     await Promise.all([
@@ -108,7 +153,7 @@ export async function getDashboardStats(params: {
           direction: "OUTBOUND",
         },
       }),
-      role === "ADMIN"
+      adminScope
         ? prisma.conversation.count({
             where: {
               organizationId,
@@ -123,7 +168,7 @@ export async function getDashboardStats(params: {
     (r) => !r.messages[0] || r.messages[0].direction === MessageDirection.INBOUND,
   ).length;
 
-  const [inboundYesterday, outboundYesterday, last7Days, operatorOutboundToday, broadcastSummary] =
+  const [inboundYesterday, outboundYesterday, last7Days, operatorActivityToday, broadcastSummary] =
     await Promise.all([
       prisma.message.count({
         where: {
@@ -140,10 +185,10 @@ export async function getDashboardStats(params: {
         },
       }),
       buildLast7DaySeries({ organizationId, userId, role, todayStart }),
-      role === "ADMIN"
-        ? buildOperatorOutboundToday({ organizationId, todayStart })
-        : Promise.resolve([] as OperatorOutboundToday[]),
-      role === "ADMIN"
+      role === UserRoleEnum.ADMIN
+        ? buildOperatorActivityToday({ organizationId, todayStart })
+        : Promise.resolve([] as OperatorActivityToday[]),
+      role === UserRoleEnum.ADMIN
         ? buildBroadcastDashboardSummary({ organizationId, todayStart })
         : Promise.resolve(null as BroadcastDashboardSummary | null),
     ]);
@@ -158,8 +203,9 @@ export async function getDashboardStats(params: {
     inboundYesterday,
     outboundYesterday,
     last7Days,
-    operatorOutboundToday,
+    operatorActivityToday,
     broadcastSummary,
+    shiftActive: true,
   };
 }
 
@@ -174,15 +220,16 @@ async function buildLast7DaySeries(params: {
   start.setDate(start.getDate() - 6);
   start.setHours(0, 0, 0, 0);
 
-  const msgWhere =
-    role === "ADMIN"
-      ? { conversation: { organizationId } }
-      : {
-          conversation: {
-            organizationId,
-            assignments: { some: { userId, unassignedAt: null } },
-          },
-        };
+  const adminScope = role === UserRoleEnum.ADMIN || role === UserRoleEnum.NOBETCI;
+
+  const msgWhere = adminScope
+    ? { conversation: { organizationId } }
+    : {
+        conversation: {
+          organizationId,
+          assignments: { some: { userId, unassignedAt: null } },
+        },
+      };
 
   const rows = await prisma.message.findMany({
     where: {
@@ -212,45 +259,96 @@ async function buildLast7DaySeries(params: {
   return points;
 }
 
-async function buildOperatorOutboundToday(params: {
+async function buildOperatorActivityToday(params: {
   organizationId: string;
   todayStart: Date;
-}): Promise<OperatorOutboundToday[]> {
+}): Promise<OperatorActivityToday[]> {
   const { organizationId, todayStart } = params;
 
-  const grouped = await prisma.message.groupBy({
-    by: ["sentByUserId"],
+  const staff = await prisma.user.findMany({
     where: {
-      direction: MessageDirection.OUTBOUND,
-      createdAt: { gte: todayStart },
-      sentByUserId: { not: null },
-      conversation: { organizationId },
+      organizationId,
+      active: true,
+      role: { in: [UserRoleEnum.OPERATOR, UserRoleEnum.NOBETCI] },
     },
-    _count: { id: true },
-    orderBy: { _count: { id: "desc" } },
-    take: 8,
+    select: { id: true, name: true, email: true, role: true },
+    orderBy: [{ name: "asc" }, { email: "asc" }],
   });
 
-  const ids = grouped.map((g) => g.sentByUserId).filter(Boolean) as string[];
-  if (ids.length === 0) return [];
+  if (!staff.length) return [];
 
-  const users = await prisma.user.findMany({
-    where: { id: { in: ids }, organizationId },
-    select: { id: true, name: true, email: true },
+  const [inboundRows, openRows, outboundGrouped] = await Promise.all([
+    prisma.$queryRaw<Array<{ userId: string; cnt: bigint }>>(
+      Prisma.sql`
+        SELECT a."userId", COUNT(DISTINCT m.id) AS cnt
+        FROM "Message" m
+        INNER JOIN "Conversation" c ON c.id = m."conversationId"
+        INNER JOIN "ConversationAssignment" a ON a."conversationId" = c.id
+        WHERE c."organizationId" = ${organizationId}
+          AND m.direction = 'INBOUND'::"MessageDirection"
+          AND m."createdAt" >= ${todayStart}
+          AND a."assignedAt" <= m."createdAt"
+          AND (a."unassignedAt" IS NULL OR a."unassignedAt" > m."createdAt")
+        GROUP BY a."userId"
+      `,
+    ),
+    prisma.$queryRaw<Array<{ userId: string; cnt: bigint }>>(
+      Prisma.sql`
+        SELECT ca."userId", COUNT(DISTINCT c.id) AS cnt
+        FROM "Conversation" c
+        INNER JOIN "ConversationAssignment" ca ON ca."conversationId" = c.id
+        WHERE c."organizationId" = ${organizationId}
+          AND c.status = 'OPEN'::"ConversationStatus"
+          AND ca."unassignedAt" IS NULL
+        GROUP BY ca."userId"
+      `,
+    ),
+    prisma.message.groupBy({
+      by: ["sentByUserId"],
+      where: {
+        direction: MessageDirection.OUTBOUND,
+        createdAt: { gte: todayStart },
+        sentByUserId: { not: null },
+        conversation: { organizationId },
+      },
+      _count: { id: true },
+    }),
+  ]);
+
+  const inboundMap = new Map(
+    inboundRows.map((r) => [r.userId, Number(r.cnt)]),
+  );
+  const openMap = new Map(openRows.map((r) => [r.userId, Number(r.cnt)]));
+  const outboundMap = new Map<string, number>();
+  for (const g of outboundGrouped) {
+    if (g.sentByUserId) outboundMap.set(g.sentByUserId, g._count.id);
+  }
+
+  const rows: OperatorActivityToday[] = staff.map((u) => {
+    const inboundToday = inboundMap.get(u.id) ?? 0;
+    const outboundToday = outboundMap.get(u.id) ?? 0;
+    const openAssigned = openMap.get(u.id) ?? 0;
+    const role: OperatorActivityToday["role"] =
+      u.role === UserRoleEnum.NOBETCI ? "NOBETCI" : "OPERATOR";
+    return {
+      userId: u.id,
+      name: u.name?.trim() || u.email,
+      email: u.email,
+      role,
+      openAssigned,
+      inboundToday,
+      outboundToday,
+      messagesToday: inboundToday + outboundToday,
+    };
   });
-  const byId = new Map(users.map((u) => [u.id, u]));
 
-  return grouped
-    .map((g) => {
-      const u = g.sentByUserId ? byId.get(g.sentByUserId) : undefined;
-      return {
-        userId: g.sentByUserId ?? "",
-        name: u?.name ?? u?.email ?? g.sentByUserId ?? "",
-        email: u?.email ?? "",
-        outbound: g._count.id,
-      };
-    })
-    .filter((x) => x.userId);
+  rows.sort((a, b) => {
+    if (b.messagesToday !== a.messagesToday) return b.messagesToday - a.messagesToday;
+    if (b.openAssigned !== a.openAssigned) return b.openAssigned - a.openAssigned;
+    return a.name.localeCompare(b.name, "tr");
+  });
+
+  return rows;
 }
 
 async function buildBroadcastDashboardSummary(params: {

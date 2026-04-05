@@ -91,7 +91,11 @@ export default async function DashboardLayout({
             {session.user.name ?? session.user.email}
           </p>
           <span className="mt-1 inline-block rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-800">
-            {session.user.role === "ADMIN" ? "Yönetici" : "Operatör"}
+            {session.user.role === "ADMIN"
+              ? "Yönetici"
+              : session.user.role === "NOBETCI"
+                ? "Nöbetçi"
+                : "Operatör"}
           </span>
           <form
             className="mt-3"

@@ -17,7 +17,7 @@ export type InboxItemJson = {
 
 export function mapConversationRowsToInboxItems(
   rows: ConversationListRow[],
-  user: { role: "ADMIN" | "OPERATOR" },
+  user: { role: "ADMIN" | "OPERATOR" | "NOBETCI"; revealCustomerPhone: boolean },
 ): InboxItemJson[] {
   return rows.map((c) => {
     const last = c.messages[0];
@@ -47,11 +47,12 @@ export function mapConversationRowsToInboxItems(
     return {
       id: c.id,
       href: `/dashboard/inbox/${c.id}`,
-      title: contactDisplayLabel(c.contact.displayName, c.contact.waId, user.role),
+      title: contactDisplayLabel(c.contact.displayName, c.contact.waId, user.revealCustomerPhone),
       preview,
       channelLabel: c.channel.internalLabel,
-      metaHint: user.role === "ADMIN" ? c.channel.metaPhoneNumberId : null,
-      assignees: user.role === "ADMIN" && assignees ? assignees : null,
+      metaHint: user.revealCustomerPhone ? c.channel.metaPhoneNumberId : null,
+      assignees:
+        (user.role === "ADMIN" || user.role === "NOBETCI") && assignees ? assignees : null,
       tags,
       unanswered,
     };
